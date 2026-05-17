@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack --yes)",
+      "Read(//Users/Hamad/Desktop/Coding/Claude/**)",
+      "Bash(rm -rf /tmp/waitless-scaffold)",
+      "Bash(npx --yes create-next-app@latest /tmp/waitless-scaffold --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack --yes)",
+      "Bash(shopt -s dotglob)",
+      "Bash(mv /tmp/waitless-scaffold/* /Users/Hamad/Desktop/Coding/Claude/Waitless/)",
+      "Bash(rmdir /tmp/waitless-scaffold)",
+      "Bash(setopt dotglob *)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(echo \"---done with $?\")",
+      "Bash(NEXT_PUBLIC_SUPABASE_URL=\"https://example.supabase.co\" NEXT_PUBLIC_SUPABASE_ANON_KEY=\"placeholder\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx next build)",
+      "Bash(npx next *)",
+      "Bash(npx eslint *)",
+      "Bash(npm run *)",
+      "Bash(echo \"lint:$?\")"
+    ]
+  }
+}
