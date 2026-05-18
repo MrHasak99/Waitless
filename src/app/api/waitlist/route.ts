@@ -22,7 +22,23 @@ export async function POST(req: Request) {
   }
 
   const service = createSupabaseServiceClient();
-  // Position = current count + 1 for that slot.
+
+  // If the diner is already on the waitlist for this slot, return that
+  // entry — idempotent so the UI can call freely.
+  const { data: existing } = await service
+    .from("waitlist_entries")
+    .select("id, position, party_size")
+    .eq("slot_id", parsed.data.slotId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (existing) {
+    return NextResponse.json({
+      ok: true,
+      position: existing.position,
+      alreadyJoined: true,
+    });
+  }
+
   const { count } = await service
     .from("waitlist_entries")
     .select("id", { count: "exact", head: true })
@@ -49,5 +65,9 @@ export async function POST(req: Request) {
     href: `/bookings`,
   });
 
-  return NextResponse.json({ ok: true, position: data.position });
+  return NextResponse.json({
+    ok: true,
+    position: data.position,
+    alreadyJoined: false,
+  });
 }

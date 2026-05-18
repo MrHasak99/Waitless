@@ -17,7 +17,7 @@ export default async function BookingDetail({
     supabase
       .from("bookings")
       .select(
-        "id, party_size, status, risk_score, deposit_required, deposit_paid_at, arrangement_fee_kwd, created_at, restaurants(id, name, address, area), time_slots(start_time, end_time)",
+        "id, party_size, status, risk_score, deposit_required, deposit_paid_at, arrangement_fee_kwd, table_id, created_at, restaurants(id, name, address, area), time_slots(start_time, end_time)",
       )
       .eq("id", id)
       .single(),
@@ -43,6 +43,7 @@ export default async function BookingDetail({
   const involvedTableIds: string[] = [
     ...((merge?.table_ids as string[] | undefined) ?? []),
     ...(borrow ? [borrow.from_table_id, borrow.to_table_id] : []),
+    ...(booking.table_id ? [booking.table_id] : []),
   ];
   let tableLabels = new Map<string, string>();
   if (involvedTableIds.length > 0) {
@@ -101,6 +102,11 @@ export default async function BookingDetail({
             {tableLabels.get(borrow.to_table_id) ?? "?"} + {borrow.seats}{" "}
             extra chair{borrow.seats === 1 ? "" : "s"} from{" "}
             {tableLabels.get(borrow.from_table_id) ?? "?"}
+          </Row>
+        )}
+        {!merge && !borrow && booking.table_id && (
+          <Row label="Table">
+            {tableLabels.get(booking.table_id) ?? "—"}
           </Row>
         )}
         {Number(booking.arrangement_fee_kwd) > 0 && (

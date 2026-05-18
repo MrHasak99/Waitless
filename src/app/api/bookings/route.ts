@@ -84,13 +84,15 @@ export async function POST(req: Request) {
       ? "This slot just filled up — please pick another."
       : msg.includes("SLOT_NOT_FOUND")
         ? "Slot no longer available."
-        : msg.includes("TABLE_ALREADY_MERGED") ||
-            msg.includes("TABLE_IN_BORROW")
-          ? "Another diner grabbed those tables just now — pick a different arrangement."
-          : msg.includes("MERGE_TOO_SMALL") ||
-              msg.includes("BORROW_TOO_SMALL")
-            ? "That arrangement doesn't fit your party."
-            : msg;
+        : msg.includes("NO_TABLE_AVAILABLE")
+          ? "No physical table at this restaurant fits your party right now. Try a merge/borrow suggestion, or pick a different time."
+          : msg.includes("TABLE_ALREADY_MERGED") ||
+              msg.includes("TABLE_IN_BORROW")
+            ? "Another diner grabbed those tables just now — pick a different arrangement."
+            : msg.includes("MERGE_TOO_SMALL") ||
+                msg.includes("BORROW_TOO_SMALL")
+              ? "That arrangement doesn't fit your party."
+              : msg;
     return NextResponse.json({ error: friendly }, { status: 409 });
   }
 

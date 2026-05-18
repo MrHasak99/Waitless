@@ -73,11 +73,40 @@ export function NotificationBell() {
 
   async function markRead(n: Notification) {
     if (n.read) return;
+    // Optimistic — clear immediately so the badge updates even if the user
+    // navigates away before the DB UPDATE round-trips.
+    setItems((curr) =>
+      curr.map((x) => (x.id === n.id ? { ...x, read: true } : x)),
+    );
     const supabase = createSupabaseBrowserClient();
-    await supabase
+    const { error } = await supabase
       .from("notifications")
       .update({ read: true })
       .eq("id", n.id);
+    if (error) {
+      // Roll back on failure.
+      setItems((curr) =>
+        curr.map((x) => (x.id === n.id ? { ...x, read: false } : x)),
+      );
+    }
+  }
+
+  async function markAllRead() {
+    if (unread === 0) return;
+    // Optimistic — flip every unread item in local state.
+    setItems((curr) =>
+      curr.map((x) => (x.read ? x : { ...x, read: true })),
+    );
+    const supabase = createSupabaseBrowserClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase
+      .from("notifications")
+      .update({ read: true })
+      .eq("user_id", user.id)
+      .eq("read", false);
   }
 
   return (
@@ -97,8 +126,19 @@ export function NotificationBell() {
       </button>
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
-          <div className="border-b border-border px-3 py-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Notifications
+          <div className="flex items-center justify-between border-b border-border px-3 py-2">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Notifications
+            </span>
+            {unread > 0 && (
+              <button
+                type="button"
+                onClick={markAllRead}
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Mark all as read
+              </button>
+            )}
           </div>
           <ul className="max-h-96 divide-y divide-border overflow-y-auto">
             {items.length === 0 && (

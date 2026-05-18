@@ -22,11 +22,13 @@ export type Table = {
 
 export type Merge = { table_ids: string[] };
 export type Borrow = { from_table_id: string; to_table_id: string };
+export type ActiveBooking = { table_id: string | null };
 
 export type SuggestionInput = {
   tables: Table[];
   existingMerges: Merge[];
   existingBorrows: Borrow[];
+  existingBookings: ActiveBooking[];
   partySize: number;
   mergeFee: number;
   borrowSeatFee: number;
@@ -75,16 +77,23 @@ export function suggest(input: SuggestionInput): SuggestionResult {
     tables,
     existingMerges,
     existingBorrows,
+    existingBookings,
     partySize,
     mergeFee,
     borrowSeatFee,
   } = input;
 
+  // A table is "committed" for this slot if it's referenced by any active
+  // booking, merge, or borrow. The booking flow now claims one physical
+  // table per booking, so the same table can't host two parties at once.
   const occupied = new Set<string>();
   for (const m of existingMerges) for (const id of m.table_ids) occupied.add(id);
   for (const b of existingBorrows) {
     occupied.add(b.from_table_id);
     occupied.add(b.to_table_id);
+  }
+  for (const b of existingBookings) {
+    if (b.table_id) occupied.add(b.table_id);
   }
   const free = tables.filter((t) => !occupied.has(t.id));
 

@@ -31,7 +31,7 @@ export function TablesManager({ restaurantId, initialTables }: Props) {
           );
           if (!res.ok) {
             const j = await res.json().catch(() => ({}));
-            resolve({ ok: false, error: j.error ?? "Save failed" });
+            resolve({ ok: false, error: friendlyError(j.error) });
             return;
           }
           router.refresh();
@@ -57,7 +57,7 @@ export function TablesManager({ restaurantId, initialTables }: Props) {
       );
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        setGlobalErr(j.error ?? "Delete failed");
+        setGlobalErr(friendlyError(j.error));
         return;
       }
       router.refresh();
@@ -85,7 +85,7 @@ export function TablesManager({ restaurantId, initialTables }: Props) {
       );
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        setGlobalErr(j.error ?? "Create failed");
+        setGlobalErr(friendlyError(j.error));
         return;
       }
       setNewTable({ label: "", seats: 4 });
@@ -362,4 +362,17 @@ function sameSet<T>(a: Set<T>, b: Set<T>) {
   if (a.size !== b.size) return false;
   for (const v of a) if (!b.has(v)) return false;
   return true;
+}
+
+// The capacity-sync trigger raises with a long Postgres message; collapse it
+// to something an admin can act on.
+function friendlyError(raw: string | undefined): string {
+  if (!raw) return "Save failed";
+  if (raw.includes("CAPACITY_BELOW_BOOKED")) {
+    return "This change would over-subscribe an upcoming slot — diners have already booked beyond the new total capacity. Cancel some bookings first or pick a smaller reduction.";
+  }
+  if (raw.includes("restaurant_tables_min_seats")) {
+    return "Each table must have at least 2 seats.";
+  }
+  return raw;
 }

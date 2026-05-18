@@ -17,7 +17,8 @@
       "Bash(npx next *)",
       "Bash(npx eslint *)",
       "Bash(npm run *)",
-      "Bash(echo \"lint:$?\")"
+      "Bash(echo \"lint:$?\")",
+      "Bash(lsof -ti:3000)"
     ]
   }
 }

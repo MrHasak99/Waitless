@@ -43,6 +43,8 @@ export default async function AdminRestaurantDetail({
 
   if (!restaurant) notFound();
 
+  const totalSeats = (tables ?? []).reduce((s, t) => s + t.seats, 0);
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-4 text-xs">
@@ -66,9 +68,16 @@ export default async function AdminRestaurantDetail({
       </section>
 
       <section className="mt-10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Tables ({tables?.length ?? 0})
-        </h2>
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Tables ({tables?.length ?? 0})
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Total capacity:{" "}
+            <strong className="text-foreground">{totalSeats} seats</strong>{" "}
+            (auto-computed, applied to all upcoming slots)
+          </p>
+        </div>
         <TablesManager restaurantId={id} initialTables={tables ?? []} />
       </section>
 

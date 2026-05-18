@@ -58,6 +58,12 @@ export function SlotPicker({
   const [chosenArrangement, setChosenArrangement] = useState<Suggestion | null>(
     null,
   );
+  const [waitlist, setWaitlist] = useState<
+    | { status: "idle" }
+    | { status: "loading" }
+    | { status: "joined"; position: number; alreadyJoined: boolean }
+    | { status: "error"; message: string }
+  >({ status: "idle" });
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -163,6 +169,7 @@ export function SlotPicker({
   function selectSlot(id: string) {
     setSelectedSlot(id);
     setError(null);
+    setWaitlist({ status: "idle" });
     void fetchAiHint(id, partySize);
     void fetchSuggestions(id, partySize);
   }
@@ -170,10 +177,35 @@ export function SlotPicker({
   function changeParty(n: number) {
     setPartySize(n);
     setChosenArrangement(null);
+    setWaitlist({ status: "idle" });
     if (selectedSlot) {
       void fetchAiHint(selectedSlot, n);
       void fetchSuggestions(selectedSlot, n);
     }
+  }
+
+  async function joinWaitlist() {
+    if (!selected) return;
+    setWaitlist({ status: "loading" });
+    const res = await fetch("/api/waitlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotId: selected.id, partySize }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setWaitlist({
+        status: "error",
+        message: body.error ?? "Could not join the waitlist.",
+      });
+      return;
+    }
+    const json = await res.json();
+    setWaitlist({
+      status: "joined",
+      position: json.position,
+      alreadyJoined: Boolean(json.alreadyJoined),
+    });
   }
 
   async function handleBook() {
@@ -313,6 +345,8 @@ export function SlotPicker({
             state={suggest}
             chosen={chosenArrangement}
             onChoose={setChosenArrangement}
+            waitlist={waitlist}
+            onJoinWaitlist={joinWaitlist}
           />
 
           {error && (
@@ -344,14 +378,24 @@ export function SlotPicker({
   );
 }
 
+type WaitlistState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "joined"; position: number; alreadyJoined: boolean }
+  | { status: "error"; message: string };
+
 function SuggestionPanel({
   state,
   chosen,
   onChoose,
+  waitlist,
+  onJoinWaitlist,
 }: {
   state: SuggestState;
   chosen: Suggestion | null;
   onChoose: (s: Suggestion | null) => void;
+  waitlist: WaitlistState;
+  onJoinWaitlist: () => void;
 }) {
   if (state.status === "idle" || state.status === "single_table_ok") {
     return null;
@@ -365,17 +409,23 @@ function SuggestionPanel({
   }
   if (state.status === "slot_full") {
     return (
-      <p className="mt-3 text-sm text-red-600">
-        This slot is full for your party size. Pick another time.
-      </p>
+      <div className="mt-3 space-y-2">
+        <p className="text-sm text-red-600">
+          This slot is full for your party size.
+        </p>
+        <WaitlistCta state={waitlist} onJoin={onJoinWaitlist} />
+      </div>
     );
   }
   if (state.status === "no_arrangement_possible") {
     return (
-      <p className="mt-3 text-sm text-yellow-700 dark:text-yellow-300">
-        No single table or workable combination fits your party at this time.
-        Try a smaller party, a different time, or join the waitlist.
-      </p>
+      <div className="mt-3 space-y-2">
+        <p className="text-sm text-yellow-700 dark:text-yellow-300">
+          No single table or workable combination fits your party at this time.
+          Try a smaller party, a different time, or join the waitlist.
+        </p>
+        <WaitlistCta state={waitlist} onJoin={onJoinWaitlist} />
+      </div>
     );
   }
 
@@ -437,6 +487,43 @@ function SuggestionPanel({
         <p className="text-[11px] text-muted-foreground">
           Tap the option again to deselect.
         </p>
+      )}
+    </div>
+  );
+}
+
+function WaitlistCta({
+  state,
+  onJoin,
+}: {
+  state: WaitlistState;
+  onJoin: () => void;
+}) {
+  if (state.status === "joined") {
+    return (
+      <p className="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-200">
+        {state.alreadyJoined
+          ? `You're already on the waitlist at position #${state.position}.`
+          : `You're on the waitlist at position #${state.position}. We'll notify you the moment a seat opens.`}
+      </p>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        onClick={onJoin}
+        disabled={state.status === "loading"}
+      >
+        {state.status === "loading" ? "Joining…" : "Join the waitlist"}
+      </Button>
+      <span className="text-xs text-muted-foreground">
+        Get notified if a seat opens before service.
+      </span>
+      {state.status === "error" && (
+        <span className="text-xs text-red-600">{state.message}</span>
       )}
     </div>
   );
