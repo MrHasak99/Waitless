@@ -10,21 +10,32 @@ export async function getRecommendedRestaurants(
 ): Promise<string[]> {
   if (restaurants.length === 0) return [];
   const supabase = await createSupabaseServerClient();
-  const { data: history } = await supabase
-    .from("bookings")
-    .select("restaurant_id, party_size, status, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(20);
+  const [{ data: history }, { data: dismissed }] = await Promise.all([
+    supabase
+      .from("bookings")
+      .select("restaurant_id, party_size, status, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("recommendation_dismissals")
+      .select("restaurant_id")
+      .eq("user_id", userId),
+  ]);
+
+  // Never recommend something the user explicitly marked "not interested".
+  const dismissedSet = new Set(
+    (dismissed ?? []).map((d) => d.restaurant_id),
+  );
+  const eligible = restaurants.filter((r) => !dismissedSet.has(r.id));
+  if (eligible.length === 0) return [];
 
   if (!history || history.length === 0) {
-    // Cold start: pick a small sample.
-    return restaurants.slice(0, 2).map((r) => r.id);
+    return eligible.slice(0, 2).map((r) => r.id);
   }
 
-  // Heuristic fallback when LLM is unavailable.
   const visited = new Set(history.map((b) => b.restaurant_id));
-  const heuristic = restaurants
+  const heuristic = eligible
     .filter((r) => visited.has(r.id))
     .map((r) => r.id)
     .slice(0, 3);
@@ -44,7 +55,7 @@ export async function getRecommendedRestaurants(
             party_size: b.party_size,
             status: b.status,
           })),
-          candidates: restaurants.map((r) => ({
+          candidates: eligible.map((r) => ({
             id: r.id,
             name: r.name,
             cuisine: r.cuisine,
@@ -59,8 +70,8 @@ export async function getRecommendedRestaurants(
   if (!r.ok) return heuristic;
   try {
     const parsed = JSON.parse(r.text) as { ids?: string[] };
-    const ids = (parsed.ids ?? []).filter((id) =>
-      restaurants.some((r) => r.id === id),
+    const ids = (parsed.ids ?? []).filter(
+      (id) => eligible.some((c) => c.id === id) && !dismissedSet.has(id),
     );
     return ids.length > 0 ? ids.slice(0, 3) : heuristic;
   } catch {

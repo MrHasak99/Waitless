@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { SignupBookingChart } from "@/components/admin/Charts";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export default async function AdminHome() {
   const sevenDays = new Date(now.getTime() - 7 * 24 * 3600 * 1000).toISOString();
   const thirtyDays = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString();
 
-  const [{ count: totalUsers }, { count: newUsers }, { count: activeBookings }] =
+  const [{ count: totalUsers }, { count: newUsers }, { count: activeBookings }, { data: signupRows }, { data: bookingRows }, { data: activeIds }] =
     await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase
@@ -21,14 +22,45 @@ export default async function AdminHome() {
         .from("bookings")
         .select("id", { count: "exact", head: true })
         .gte("created_at", thirtyDays),
+      supabase
+        .from("profiles")
+        .select("created_at")
+        .gte("created_at", thirtyDays),
+      supabase
+        .from("bookings")
+        .select("created_at")
+        .gte("created_at", thirtyDays),
+      supabase
+        .from("bookings")
+        .select("user_id")
+        .gte("created_at", thirtyDays),
     ]);
 
-  // Quick "active users" — users with any booking in last 30d.
-  const { data: activeIds } = await supabase
-    .from("bookings")
-    .select("user_id")
-    .gte("created_at", thirtyDays);
   const activeUsers = new Set((activeIds ?? []).map((b) => b.user_id)).size;
+
+  // Bucket signups + bookings per day for the last 30 days.
+  const dayKey = (iso: string) => new Date(iso).toISOString().slice(0, 10);
+  const series = new Map<string, { signups: number; bookings: number }>();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 3600 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    series.set(d, { signups: 0, bookings: 0 });
+  }
+  for (const r of signupRows ?? []) {
+    const k = dayKey(r.created_at);
+    const bucket = series.get(k);
+    if (bucket) bucket.signups += 1;
+  }
+  for (const r of bookingRows ?? []) {
+    const k = dayKey(r.created_at);
+    const bucket = series.get(k);
+    if (bucket) bucket.bookings += 1;
+  }
+  const chartData = Array.from(series.entries()).map(([date, v]) => ({
+    date,
+    ...v,
+  }));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -57,8 +89,12 @@ export default async function AdminHome() {
         <Stat label="Bookings (30d)" value={activeBookings ?? 0} />
       </div>
 
+      <div className="mt-6">
+        <SignupBookingChart data={chartData} />
+      </div>
+
       <p className="mt-8 text-xs text-muted-foreground">
-        Data refreshes every 5 minutes. Use{" "}
+        Data refreshes on every page load. Use{" "}
         <a
           href="/api/admin/export?type=bookings"
           className="text-accent hover:underline"

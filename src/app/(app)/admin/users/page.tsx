@@ -26,9 +26,22 @@ export default async function AdminUsers({
 
   const { data: users } = await query;
 
+  // Build an export link that mirrors the current filters.
+  const exportParams = new URLSearchParams({ type: "users" });
+  if (q) exportParams.set("q", q);
+  if (role) exportParams.set("role", role);
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
-      <h1 className="text-2xl font-semibold">Users</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Users</h1>
+        <a
+          href={`/api/admin/export?${exportParams.toString()}`}
+          className="text-sm text-accent hover:underline"
+        >
+          Export CSV (filtered)
+        </a>
+      </div>
       <form className="mt-4 flex gap-2" action="/admin/users">
         <input
           type="text"

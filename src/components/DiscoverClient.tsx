@@ -29,6 +29,16 @@ export function DiscoverClient({ restaurants, recommendedIds }: Props) {
   const [unit, setUnit] = useState<"km" | "mi">("km");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  function dismissRec(id: string) {
+    setDismissed((curr) => new Set(curr).add(id));
+    void fetch("/api/recommendations/dismiss", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ restaurantId: id }),
+    });
+  }
 
   useEffect(() => {
     if (!("geolocation" in navigator)) return;
@@ -96,46 +106,59 @@ export function DiscoverClient({ restaurants, recommendedIds }: Props) {
       <div className="mb-6 overflow-hidden rounded-xl border border-border">
         <RestaurantMap
           restaurants={enriched}
+          distanceUnit={unit}
           user={userLoc}
           selectedId={selectedId}
         />
       </div>
 
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {enriched.map((r) => (
-          <li
-            key={r.id}
-            onMouseEnter={() => setSelectedId(r.id)}
-            onMouseLeave={() => setSelectedId(null)}
-            className="rounded-xl border border-border bg-card p-4 transition hover:border-accent/40"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="font-semibold">{r.name}</h3>
-              {recommendedSet.has(r.id) && (
-                <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
-                  For you
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {r.cuisine}
-              {r.area ? ` · ${r.area}` : ""} · {formatDistance(r.distanceKm, unit)}
-            </p>
-            {r.description && (
-              <p className="mt-3 text-sm text-muted-foreground line-clamp-2">
-                {r.description}
+        {enriched
+          .filter((r) => !dismissed.has(r.id))
+          .map((r) => (
+            <li
+              key={r.id}
+              onMouseEnter={() => setSelectedId(r.id)}
+              onMouseLeave={() => setSelectedId(null)}
+              className="rounded-xl border border-border bg-card p-4 transition hover:border-accent/40"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold">{r.name}</h3>
+                {recommendedSet.has(r.id) && (
+                  <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+                    For you
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {r.cuisine}
+                {r.area ? ` · ${r.area}` : ""} ·{" "}
+                {formatDistance(r.distanceKm, unit)}
               </p>
-            )}
-            <div className="mt-4">
-              <Link
-                href={`/restaurants/${r.id}`}
-                className="text-sm font-medium text-accent hover:underline"
-              >
-                View tables &amp; book →
-              </Link>
-            </div>
-          </li>
-        ))}
+              {r.description && (
+                <p className="mt-3 text-sm text-muted-foreground line-clamp-2">
+                  {r.description}
+                </p>
+              )}
+              <div className="mt-4 flex items-center justify-between">
+                <Link
+                  href={`/restaurants/${r.id}`}
+                  className="text-sm font-medium text-accent hover:underline"
+                >
+                  View tables &amp; book →
+                </Link>
+                {recommendedSet.has(r.id) && (
+                  <button
+                    type="button"
+                    onClick={() => dismissRec(r.id)}
+                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    Not interested
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
       </ul>
     </div>
   );

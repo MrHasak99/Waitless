@@ -10,6 +10,19 @@ function getClient() {
 const FROM = process.env.RESEND_FROM ?? "Waitless <bookings@waitless.kw>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
+// Respect each recipient's email_opt_in preference. Returns true when the
+// recipient has opted out — caller should skip the send.
+async function isOptedOut(email: string) {
+  const service = createSupabaseServiceClient();
+  const { data } = await service
+    .from("profiles")
+    .select("email_opt_in")
+    .eq("email", email)
+    .maybeSingle();
+  if (!data) return false;
+  return data.email_opt_in === false;
+}
+
 function unsubscribeFooter() {
   return `<p style="margin-top:32px;font-size:12px;color:#888">Waitless · Kuwait · <a href="${APP_URL}/settings/notifications">Unsubscribe</a></p>`;
 }
@@ -39,6 +52,7 @@ export async function sendWelcome({ to, name }: { to: string; name: string }) {
       ${unsubscribeFooter()}
     </div>
   `;
+  if (await isOptedOut(to)) return;
   const client = getClient();
   if (!client) return;
   const { data, error } = await client.emails.send({
@@ -77,6 +91,7 @@ export async function sendBookingConfirmation({
       ${unsubscribeFooter()}
     </div>
   `;
+  if (await isOptedOut(to)) return;
   const client = getClient();
   if (!client) return;
   const { data, error } = await client.emails.send({
@@ -115,6 +130,7 @@ export async function sendBookingReminder({
       ${unsubscribeFooter()}
     </div>
   `;
+  if (await isOptedOut(to)) return;
   const client = getClient();
   if (!client) return;
   const { data, error } = await client.emails.send({

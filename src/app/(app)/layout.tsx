@@ -45,6 +45,12 @@ export default async function AppLayout({
               >
                 My bookings
               </Link>
+              <Link
+                href="/settings/notifications"
+                className="text-foreground/80 hover:text-foreground"
+              >
+                Settings
+              </Link>
               {profile?.role === "admin" && (
                 <Link
                   href="/admin"
