@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { RestaurantInfoForm } from "@/components/admin/RestaurantInfoForm";
 import { TablesManager } from "@/components/admin/TablesManager";
+import { FloorPlanEditor } from "@/components/admin/FloorPlanEditor";
 import { SlotsManager } from "@/components/admin/SlotsManager";
 import { BookingsManager } from "@/components/admin/BookingsManager";
 
@@ -65,6 +66,17 @@ export default async function AdminRestaurantDetail({
           Restaurant info
         </h2>
         <RestaurantInfoForm restaurant={restaurant} />
+      </section>
+
+      <section className="mt-10">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Floor plan layout
+        </h2>
+        <FloorPlanEditor
+          key={(tables ?? []).map((t) => t.id).join(",")}
+          restaurantId={id}
+          initialTables={tables ?? []}
+        />
       </section>
 
       <section className="mt-10">
