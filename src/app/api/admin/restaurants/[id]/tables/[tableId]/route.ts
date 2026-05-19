@@ -30,10 +30,11 @@ export async function PATCH(
   const service = createSupabaseServiceClient();
 
   // Cross-field check: max_lendable_seats vs seats and the 2-seat floor.
-  // Need the resulting state, so merge with the current row.
   const { data: current } = await service
     .from("restaurant_tables")
-    .select("seats, can_lend_seats, max_lendable_seats")
+    .select(
+      "id, seats, can_lend_seats, max_lendable_seats, adjacent_table_ids",
+    )
     .eq("id", tableId)
     .single();
   if (!current) {
@@ -59,6 +60,33 @@ export async function PATCH(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  // Mirror adjacency edits on the neighbor side so the admin only needs to
+  // mark adjacency once. The engine requires bidirectional links to merge.
+  if (parsed.data.adjacent_table_ids !== undefined) {
+    const before = new Set<string>(current.adjacent_table_ids ?? []);
+    const after = new Set<string>(parsed.data.adjacent_table_ids);
+    const added = [...after].filter((id) => !before.has(id));
+    const removed = [...before].filter((id) => !after.has(id));
+
+    if (added.length > 0 || removed.length > 0) {
+      const touched = [...new Set([...added, ...removed])];
+      const { data: neighbors } = await service
+        .from("restaurant_tables")
+        .select("id, adjacent_table_ids")
+        .in("id", touched);
+      for (const n of neighbors ?? []) {
+        const adj = new Set<string>(n.adjacent_table_ids ?? []);
+        if (added.includes(n.id)) adj.add(tableId);
+        if (removed.includes(n.id)) adj.delete(tableId);
+        await service
+          .from("restaurant_tables")
+          .update({ adjacent_table_ids: Array.from(adj) })
+          .eq("id", n.id);
+      }
+    }
+  }
+
   await recordAuditAction(guard.user.id, "update_table", tableId, parsed.data);
   return NextResponse.json({ ok: true });
 }
