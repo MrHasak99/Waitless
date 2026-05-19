@@ -15,8 +15,10 @@ export async function GET(req: Request) {
   }
 
   const service = createSupabaseServiceClient();
-  const windowStart = new Date(Date.now() + 23 * 3600 * 1000).toISOString();
-  const windowEnd = new Date(Date.now() + 25 * 3600 * 1000).toISOString();
+  // Runs once daily on Hobby plan. Widen the window to 12–36h so every
+  // booking gets one reminder somewhere in that ~24h band.
+  const windowStart = new Date(Date.now() + 12 * 3600 * 1000).toISOString();
+  const windowEnd = new Date(Date.now() + 36 * 3600 * 1000).toISOString();
 
   const { data: due } = await service
     .from("bookings")
